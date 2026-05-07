@@ -1,4 +1,6 @@
 const els = {
+  pageTitle: document.getElementById("pageTitle"),
+  pageSubtitle: document.getElementById("pageSubtitle"),
   video: document.getElementById("camera"),
   overlay: document.getElementById("overlay"),
   startBtn: document.getElementById("startBtn"),
@@ -25,6 +27,8 @@ const els = {
   diagnostics: document.getElementById("diagnostics"),
 };
 
+const appIdentity = resolveAppIdentity();
+
 const state = {
   ws: null,
   recognizer: null,
@@ -48,6 +52,7 @@ const state = {
   switchingCamera: false,
 };
 
+applyAppIdentity();
 connectWebSocket();
 loadNetworkInfo();
 registerPwa();
@@ -67,6 +72,30 @@ document.querySelectorAll("[data-mode]").forEach((button) => {
 document.querySelectorAll("[data-demo]").forEach((button) => {
   button.addEventListener("click", () => sendDemoEvent(button.dataset.demo));
 });
+
+function resolveAppIdentity() {
+  const port = window.location.port;
+  if (port === "8443" || port === "8601") {
+    return {
+      title: "SecondSight Dev",
+      subtitle: "Experimental ambient cognition runtime on the SecondSight branch",
+      context:
+        "SecondSight dev: ambient on-device cognition using MediaPipe/ODML, sparse Gemma 4 reasoning, and local memory",
+    };
+  }
+  return {
+    title: "ODML Checkpoint",
+    subtitle: "Stable On-device Gemma 4 + LiteRT-LM + MediaPipe demo",
+    context:
+      "ODML checkpoint: Google-hosted On-device Gemma 4 showcase with LiteRT-LM and MediaPipe/ODML perception",
+  };
+}
+
+function applyAppIdentity() {
+  document.title = appIdentity.title;
+  els.pageTitle.textContent = appIdentity.title;
+  els.pageSubtitle.textContent = appIdentity.subtitle;
+}
 
 async function startPerception() {
   if (state.started || state.switchingCamera) return;
@@ -430,7 +459,7 @@ function captureFrame() {
 }
 
 function currentEventContext() {
-  return "On-device Gemma 4 showcase: Google-hosted LiteRT-LM with MediaPipe/ODML perception on Android over Tailscale HTTPS";
+  return appIdentity.context;
 }
 
 function redactFrame(event) {

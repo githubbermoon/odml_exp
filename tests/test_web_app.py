@@ -8,7 +8,7 @@ def test_pwa_root_serves_html() -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "On-device Gemma 4" in response.text
+    assert "ODML Checkpoint" in response.text
 
 
 def test_network_info_exposes_demo_urls() -> None:
