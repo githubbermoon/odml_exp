@@ -67,6 +67,46 @@ p {
   color: var(--muted);
 }
 
+.project-details {
+  margin-top: 10px;
+  max-width: 760px;
+  color: var(--muted);
+}
+
+.project-details summary {
+  width: fit-content;
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid rgba(123, 223, 242, 0.28);
+  border-radius: 8px;
+  background: rgba(123, 223, 242, 0.08);
+  color: var(--cyan);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 680;
+  list-style-position: inside;
+}
+
+.project-details-body {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-left: 2px solid rgba(117, 230, 176, 0.48);
+  background: rgba(13, 24, 32, 0.5);
+}
+
+.project-details-body p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.project-details-body p + p {
+  margin-top: 6px;
+  color: #cfe6f4;
+}
+
 .status-stack {
   display: flex;
   gap: 8px;

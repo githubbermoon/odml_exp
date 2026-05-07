@@ -1,6 +1,8 @@
 const els = {
   pageTitle: document.getElementById("pageTitle"),
   pageSubtitle: document.getElementById("pageSubtitle"),
+  projectDescription: document.getElementById("projectDescription"),
+  projectUseCase: document.getElementById("projectUseCase"),
   video: document.getElementById("camera"),
   overlay: document.getElementById("overlay"),
   startBtn: document.getElementById("startBtn"),
@@ -79,6 +81,10 @@ function resolveAppIdentity() {
     return {
       title: "SecondSight Dev",
       subtitle: "Experimental ambient cognition runtime on the SecondSight branch",
+      description:
+        "Builds toward an ambient cognitive companion: MediaPipe stays on the dense realtime path, while Gemma 4 is invoked sparsely for memory, planning, and proactive assistance.",
+      useCase:
+        "Example: the phone notices a pause at a deployment diagram, stores the moment, then later offers a short recap when attention or confusion shifts.",
       context:
         "SecondSight dev: ambient on-device cognition using MediaPipe/ODML, sparse Gemma 4 reasoning, and local memory",
     };
@@ -86,6 +92,10 @@ function resolveAppIdentity() {
   return {
     title: "ODML Checkpoint",
     subtitle: "Stable On-device Gemma 4 + LiteRT-LM + MediaPipe demo",
+    description:
+      "Preserves the event-ready ODML demo: Android browser MediaPipe converts camera signals into semantic events, and the Mac streams local Gemma 4 reasoning through LiteRT-LM.",
+    useCase:
+      "Example: point the Samsung camera at a whiteboard, trigger Inspect pipeline, and show how the local ODML/Gemma stack explains the visible setup.",
     context:
       "ODML checkpoint: Google-hosted On-device Gemma 4 showcase with LiteRT-LM and MediaPipe/ODML perception",
   };
@@ -95,6 +105,8 @@ function applyAppIdentity() {
   document.title = appIdentity.title;
   els.pageTitle.textContent = appIdentity.title;
   els.pageSubtitle.textContent = appIdentity.subtitle;
+  els.projectDescription.textContent = appIdentity.description;
+  els.projectUseCase.textContent = appIdentity.useCase;
 }
 
 async function startPerception() {
