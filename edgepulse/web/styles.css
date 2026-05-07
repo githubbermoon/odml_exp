@@ -10,6 +10,7 @@
   --cyan: #7bdff2;
   --amber: #ffd166;
   --danger: #ff6b6b;
+  --violet: #b89cff;
 }
 
 * {
@@ -185,6 +186,104 @@ canvas {
   font-size: 13px;
 }
 
+.ambient-orb {
+  position: absolute;
+  z-index: 5;
+  left: 18px;
+  bottom: 22px;
+  width: 88px;
+  height: 88px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  filter: drop-shadow(0 0 28px rgba(123, 223, 242, 0.38));
+}
+
+.orb-core,
+.orb-ring {
+  position: absolute;
+  border-radius: 999px;
+}
+
+.orb-core {
+  width: 48px;
+  height: 48px;
+  background:
+    radial-gradient(circle at 38% 28%, rgba(255, 255, 255, 0.88), transparent 0.42rem),
+    radial-gradient(circle, rgba(123, 223, 242, 0.9), rgba(117, 230, 176, 0.35) 52%, rgba(7, 16, 20, 0.2));
+  box-shadow: inset 0 0 18px rgba(255, 255, 255, 0.28), 0 0 34px rgba(123, 223, 242, 0.46);
+}
+
+.orb-ring {
+  inset: 7px;
+  border: 1px solid rgba(123, 223, 242, 0.42);
+  animation: orbPulse 2.8s ease-in-out infinite;
+}
+
+.ambient-orb.focused .orb-core {
+  background: radial-gradient(circle, rgba(117, 230, 176, 0.94), rgba(123, 223, 242, 0.18) 58%, rgba(7, 16, 20, 0.18));
+}
+
+.ambient-orb.confused .orb-core {
+  background: radial-gradient(circle, rgba(255, 209, 102, 0.96), rgba(255, 107, 107, 0.2) 58%, rgba(7, 16, 20, 0.18));
+}
+
+.ambient-orb.reasoning .orb-ring,
+.ambient-orb.intervening .orb-ring {
+  border-color: rgba(184, 156, 255, 0.78);
+  animation-duration: 1.1s;
+}
+
+.ambient-orb.intervening .orb-core {
+  background: radial-gradient(circle, rgba(184, 156, 255, 0.96), rgba(123, 223, 242, 0.2) 56%, rgba(7, 16, 20, 0.18));
+}
+
+.ambient-hud {
+  position: absolute;
+  z-index: 5;
+  left: 112px;
+  right: 16px;
+  bottom: 23px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid rgba(123, 223, 242, 0.22);
+  border-radius: 8px;
+  background: rgba(7, 16, 20, 0.42);
+  backdrop-filter: blur(18px);
+}
+
+.ambient-hud span {
+  display: block;
+  color: var(--cyan);
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ambient-hud strong {
+  display: block;
+  margin-top: 7px;
+  max-width: 680px;
+  color: var(--text);
+  font-size: clamp(16px, 2.4vw, 24px);
+  line-height: 1.16;
+  font-weight: 730;
+}
+
+@keyframes orbPulse {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.58;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+
 .camera-controls {
   position: absolute;
   z-index: 4;
@@ -274,6 +373,23 @@ canvas {
   line-height: 1.45;
 }
 
+.policy-strip {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 9px 10px;
+  border: 1px solid rgba(123, 223, 242, 0.22);
+  border-radius: 8px;
+  color: var(--cyan);
+  background: rgba(123, 223, 242, 0.07);
+  font-size: 12px;
+}
+
+.policy-strip strong {
+  color: var(--amber);
+}
+
 .token-rail {
   margin-top: auto;
   display: flex;
@@ -328,6 +444,34 @@ canvas {
   background: rgba(123, 223, 242, 0.08);
   border-color: rgba(123, 223, 242, 0.26);
   font-size: 12px;
+}
+
+.recall-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.recall-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 7px;
+}
+
+.recall-actions button {
+  min-height: 34px;
+  text-align: left;
+  color: #d7e8f2;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.recall-answer {
+  margin-top: 10px;
+  min-height: 54px;
+  white-space: pre-wrap;
+  color: #cfe6f4;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .capture-ask-panel {
@@ -487,7 +631,21 @@ pre {
 
   .camera-controls {
     right: 10px;
-    bottom: 68px;
+    bottom: 118px;
+  }
+
+  .ambient-orb {
+    left: 12px;
+    bottom: 14px;
+    width: 76px;
+    height: 76px;
+  }
+
+  .ambient-hud {
+    left: 90px;
+    right: 10px;
+    bottom: 14px;
+    min-height: 70px;
   }
 }
 

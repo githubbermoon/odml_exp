@@ -1,7 +1,7 @@
 {
-  "name": "On-device Gemma 4",
-  "short_name": "Gemma 4",
-  "description": "Private real-time multimodal edge AI copilot",
+  "name": "SecondSight",
+  "short_name": "SecondSight",
+  "description": "Local camera-to-text scene narration powered by MediaPipe, LiteRT-LM, and Gemma 4",
   "start_url": "/",
   "scope": "/",
   "display": "fullscreen",

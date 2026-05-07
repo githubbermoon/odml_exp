@@ -25,6 +25,12 @@ const els = {
   headPose: document.getElementById("headPose"),
   specMs: document.getElementById("specMs"),
   activeMode: document.getElementById("activeMode"),
+  ambientOrb: document.getElementById("ambientOrb"),
+  cognitiveState: document.getElementById("cognitiveState"),
+  interventionText: document.getElementById("interventionText"),
+  reasoningPolicy: document.getElementById("reasoningPolicy"),
+  importanceScore: document.getElementById("importanceScore"),
+  recallAnswer: document.getElementById("recallAnswer"),
   eventLog: document.getElementById("eventLog"),
   reasoningLog: document.getElementById("reasoningLog"),
   phoneUrl: document.getElementById("phoneUrl"),
@@ -54,6 +60,8 @@ const state = {
   latestTokens: [],
   events: [],
   reasoning: [],
+  semanticMemory: loadSemanticMemory(),
+  policyTrace: [],
   inputMode: "mediapipe_gemma",
   modelStatus: "checking",
   cameraFacingMode: "environment",
@@ -84,6 +92,9 @@ document.querySelectorAll("[data-mode]").forEach((button) => {
 });
 document.querySelectorAll("[data-demo]").forEach((button) => {
   button.addEventListener("click", () => sendDemoEvent(button.dataset.demo));
+});
+document.querySelectorAll("[data-recall]").forEach((button) => {
+  button.addEventListener("click", () => answerSemanticRecall(button.dataset.recall));
 });
 
 function resolveAppIdentity() {
@@ -152,6 +163,8 @@ function applyAppIdentity() {
   document.querySelectorAll("[data-demo]").forEach((button) => {
     button.textContent = appIdentity.taskLabels[button.dataset.demo] || button.dataset.demo;
   });
+  updateAmbientState("watching", "ODML checkpoint is waiting for semantic events.", 0, "Gemma idle");
+  renderSemanticRecallSeed();
 }
 
 async function startPerception() {
@@ -330,6 +343,9 @@ function detectWithMediaPipe(now) {
   }
   const duration = (now - state.currentEventStarted) / 1000;
   const intentSignal = inferIntentSignal(gesture, attention, headPose, duration);
+  const importance = scoreImportance(gesture, attention, headPose, intentSignal, duration, category?.score || 0.35);
+  const reasoningPolicy = chooseReasoningPolicy(intentSignal, importance, duration);
+  const cognitiveState = inferCognitiveState(attention, reasoningPolicy, intentSignal);
 
   return {
     source: "android-browser-pwa",
@@ -342,6 +358,9 @@ function detectWithMediaPipe(now) {
     duration,
     context: currentEventContext(),
     confidence: category?.score || (faceLandmarks.length ? 0.68 : 0.35),
+    importance,
+    reasoning_policy: reasoningPolicy,
+    cognitive_state: cognitiveState,
     landmarks: {
       hand: handLandmarks.slice(0, 21).map((p) => ({ x: p.x, y: p.y })),
       face: faceLandmarks.slice(0, 8).map((p) => ({ x: p.x, y: p.y })),
@@ -349,6 +368,33 @@ function detectWithMediaPipe(now) {
     ts: Date.now() / 1000,
     event_id: randomId(),
   };
+}
+
+function scoreImportance(gesture, attention, headPose, intentSignal, duration, confidence) {
+  let score = 0.08;
+  if (gesture !== "none") score += 0.34;
+  if (attention === "confused") score += 0.34;
+  if (attention === "away") score += 0.24;
+  if (headPose === "tilted_left" || headPose === "tilted_right") score += 0.16;
+  if (duration > 2.5) score += 0.18;
+  if (duration > 5) score += 0.16;
+  if (intentSignal !== "ambient_monitoring") score += 0.2;
+  score += Math.min(Math.max(confidence || 0, 0), 1) * 0.14;
+  return Math.min(1, Number(score.toFixed(2)));
+}
+
+function chooseReasoningPolicy(intentSignal, importance, duration) {
+  if (state.inputMode === "mediapipe") return "skip";
+  if (state.inputMode === "gemma_multimodal") return "invoke";
+  if (intentSignal === "ambient_monitoring" && duration < 5) return "skip";
+  return importance >= 0.58 ? "invoke" : "skip";
+}
+
+function inferCognitiveState(attention, reasoningPolicy, intentSignal) {
+  if (reasoningPolicy === "invoke") return intentSignal === "confused" ? "confused" : "reasoning";
+  if (attention === "confused") return "confused";
+  if (attention === "focused") return "focused";
+  return "watching";
 }
 
 function mapGesture(name, landmarks) {
@@ -405,6 +451,9 @@ function fallbackEvent() {
     duration: 0,
     context: currentEventContext(),
     confidence: 0.25,
+    importance: 0.08,
+    reasoning_policy: "skip",
+    cognitive_state: "watching",
     landmarks: {},
     ts: Date.now() / 1000,
     event_id: randomId(),
@@ -418,10 +467,15 @@ function maybeSendEvent(event, now) {
 
   const key = `${event.gesture}:${event.attention}:${event.head_pose}`;
   const interesting = event.gesture !== "none" || event.attention === "confused" || event.duration > 2.5;
-  if (!interesting || (key === state.lastSentKey && now - state.lastSentAt < 750)) return;
+  const skipHeartbeat = event.reasoning_policy === "skip" && now - state.lastSentAt > 3200;
+  if ((!interesting && !skipHeartbeat) || (key === state.lastSentKey && now - state.lastSentAt < 750)) {
+    updateAmbientState(event.cognitive_state, ambientLineForEvent(event), event.importance, "Gemma skipped");
+    return;
+  }
 
   state.lastSentKey = key;
   state.lastSentAt = now;
+  updateAmbientState(event.cognitive_state, ambientLineForEvent(event), event.importance, event.reasoning_policy === "invoke" ? "Gemma invoked" : "Gemma skipped");
   sendEvent(event, { includeFrame: state.inputMode === "gemma_multimodal" });
 }
 
@@ -435,22 +489,31 @@ function sendDemoEvent(kind) {
       gesture: "raised_hand",
       attention: "focused",
       head_pose: "tilted_left",
-      intent_signal: "audience_question",
+      intent_signal: "focus_assistant",
       raw_gesture: "raised_hand",
+      importance: 0.88,
+      reasoning_policy: "invoke",
+      cognitive_state: "intervening",
     },
     pointing: {
       gesture: "pointing",
       attention: "focused",
       head_pose: "center",
-      intent_signal: "inspect_on_device_pipeline",
+      intent_signal: "meeting_cognition",
       raw_gesture: "pointing",
+      importance: 0.91,
+      reasoning_policy: "invoke",
+      cognitive_state: "reasoning",
     },
     confused: {
       gesture: "none",
       attention: "confused",
       head_pose: "tilted_right",
-      intent_signal: "explain_odml_stack",
+      intent_signal: "confusion_trace",
       raw_gesture: "confused",
+      importance: 0.86,
+      reasoning_policy: "invoke",
+      cognitive_state: "confused",
     },
   };
   sendEvent({
@@ -459,6 +522,9 @@ function sendDemoEvent(kind) {
     duration: 5.2,
     context: currentEventContext(),
     confidence: 0.86,
+    importance: 0.86,
+    reasoning_policy: "invoke",
+    cognitive_state: "reasoning",
     landmarks: {},
     ts: Date.now() / 1000,
     event_id: randomId(),
@@ -491,6 +557,9 @@ function sendVisionTask(kind) {
       duration: 0,
       context: currentEventContext(),
       confidence: 0.74,
+      importance: 0.9,
+      reasoning_policy: "invoke",
+      cognitive_state: "reasoning",
       landmarks: {},
       ts: Date.now() / 1000,
       event_id: randomId(),
@@ -526,6 +595,9 @@ function analyzeCurrentFrame() {
       duration: 0,
       context: currentEventContext(),
       confidence: 0.7,
+      importance: 0.92,
+      reasoning_policy: "invoke",
+      cognitive_state: "reasoning",
       landmarks: {},
       ts: Date.now() / 1000,
       event_id: randomId(),
@@ -636,6 +708,106 @@ function redactFrame(event) {
   };
 }
 
+function updateAmbientState(cognitiveState, line, importance, policyLabel) {
+  if (!els.ambientOrb || !els.cognitiveState || !els.interventionText || !els.reasoningPolicy || !els.importanceScore) {
+    return;
+  }
+  const stateName = cognitiveState || "watching";
+  els.ambientOrb.className = `ambient-orb ${stateName}`;
+  els.cognitiveState.textContent = stateName;
+  els.interventionText.textContent = line;
+  els.reasoningPolicy.textContent = policyLabel;
+  els.importanceScore.textContent = `importance ${Number(importance || 0).toFixed(2)}`;
+}
+
+function ambientLineForEvent(event) {
+  if (event.reasoning_policy === "invoke" && event.intent_signal === "meeting_cognition") {
+    return "Meeting signal detected. Compressing context for sparse Gemma reasoning.";
+  }
+  if (event.reasoning_policy === "invoke" && event.intent_signal === "focus_assistant") {
+    return "Focus shift detected. Preparing a low-friction intervention.";
+  }
+  if (event.attention === "confused") return "Possible confusion detected. Waiting for a useful moment.";
+  if (event.attention === "focused") return "Focused state detected. Gemma stays idle unless the signal changes.";
+  return "Ambient perception active. Raw video stays on the device.";
+}
+
+function rememberSemanticMemory(memory) {
+  const compact = {
+    timestamp: memory.timestamp || Date.now() / 1000,
+    event_id: memory.event_id || randomId(),
+    summary: memory.summary || "Ambient semantic event",
+    importance: Number(memory.importance || 0),
+    cognitive_state: memory.cognitive_state || "watching",
+    gesture: memory.gesture || "none",
+    attention: memory.attention || "unknown",
+    context: memory.context || currentEventContext(),
+    reasoning_policy: memory.reasoning_policy || "skip",
+  };
+  state.semanticMemory.unshift(compact);
+  state.semanticMemory = dedupeByEventId(state.semanticMemory).slice(0, 48);
+  localStorage.setItem("secondsight.semanticMemory.v1", JSON.stringify(state.semanticMemory));
+}
+
+function loadSemanticMemory() {
+  try {
+    return JSON.parse(localStorage.getItem("secondsight.semanticMemory.v1") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function dedupeByEventId(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (seen.has(item.event_id)) return false;
+    seen.add(item.event_id);
+    return true;
+  });
+}
+
+function renderSemanticRecallSeed() {
+  if (!els.recallAnswer || !state.semanticMemory.length) return;
+  els.recallAnswer.textContent = summarizeMemories(state.semanticMemory.slice(0, 3));
+}
+
+function answerSemanticRecall(kind) {
+  if (!els.recallAnswer) return;
+  const memories = state.semanticMemory;
+  if (!memories.length) {
+    els.recallAnswer.textContent = "No semantic memories yet. Trigger Focus assistant, Meeting cognition, or Confusion trace once.";
+    return;
+  }
+
+  if (kind === "confusion") {
+    const confused = memories.filter((memory) => memory.cognitive_state === "confused" || memory.attention === "confused");
+    els.recallAnswer.textContent = confused.length
+      ? summarizeMemories(confused.slice(0, 4))
+      : "No confusion memories have been stored in this session.";
+    return;
+  }
+
+  if (kind === "research") {
+    const research = memories.filter((memory) => /research|meeting|whiteboard|pipeline|context|gemma|litert/i.test(memory.summary));
+    els.recallAnswer.textContent = summarizeMemories((research.length ? research : memories).slice(0, 4));
+    return;
+  }
+
+  els.recallAnswer.textContent = summarizeMemories(memories.slice(0, 6));
+}
+
+function summarizeMemories(memories) {
+  return memories
+    .map((memory) => {
+      const time = new Date((memory.timestamp || Date.now() / 1000) * 1000).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      return `${time}: ${memory.summary}`;
+    })
+    .join("\n");
+}
+
 function connectWebSocket() {
   const protocol = window.location.protocol === "https:" ? "wss" : "ws";
   state.ws = new WebSocket(`${protocol}://${window.location.host}/ws/events`);
@@ -668,8 +840,23 @@ function handleBackendMessage(message) {
     state.modelStatus = message.status || state.modelStatus;
     updateModeUi();
   }
+  if (message.type === "reasoning_policy") {
+    const policyLabel = message.policy === "invoke" ? "Gemma invoked" : "Gemma skipped";
+    const policyLine =
+      message.policy === "invoke"
+        ? `Sparse scheduler invoked Gemma for ${String(message.intent_signal || "semantic event").replaceAll("_", " ")}.`
+        : "Sparse scheduler skipped Gemma to preserve thermals and battery.";
+    state.policyTrace.unshift(message);
+    state.policyTrace = state.policyTrace.slice(0, 12);
+    updateAmbientState(message.cognitive_state, policyLine, message.importance, policyLabel);
+  }
+  if (message.type === "semantic_memory") {
+    rememberSemanticMemory(message.memory);
+    renderSemanticRecallSeed();
+  }
   if (message.type === "hint") {
     els.speculativeText.textContent = message.hint.text;
+    if (els.interventionText) els.interventionText.textContent = message.hint.text;
     els.specMs.textContent = `${message.hint.latency_ms.toFixed(1)} ms`;
     state.latestTokens = [];
     els.tokenRail.innerHTML = "";
@@ -684,6 +871,7 @@ function handleBackendMessage(message) {
   }
   if (message.type === "reasoning") {
     els.reasoningText.textContent = message.result.assistance;
+    updateAmbientState(message.result.should_intervene ? "intervening" : "focused", message.result.assistance, message.result.confidence, "Gemma complete");
     state.reasoning.unshift(message.result);
     state.reasoning = state.reasoning.slice(0, 6);
     els.reasoningLog.textContent = JSON.stringify(state.reasoning, null, 2);
@@ -714,9 +902,9 @@ function sendMode(mode) {
 
 function updateModeUi() {
   const labels = {
-    mediapipe: "MediaPipe fast path",
-    mediapipe_gemma: "MediaPipe + Gemma 4",
-    gemma_multimodal: "Gemma 4 Vision",
+    mediapipe: "Perception only",
+    mediapipe_gemma: "Sparse Gemma",
+    gemma_multimodal: "Vision invoke",
   };
   els.modeLabel.textContent = labels[state.inputMode] || labels.mediapipe_gemma;
   els.activeMode.textContent = state.inputMode === "mediapipe" ? "ODML" : state.inputMode === "gemma_multimodal" ? "Vision" : "Gemma 4";

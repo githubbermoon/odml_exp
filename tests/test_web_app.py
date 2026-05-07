@@ -99,9 +99,41 @@ def test_browser_websocket_streams_hint_token_and_reasoning() -> None:
             }
         )
 
-        seen = {websocket.receive_json()["type"] for _ in range(3)}
+        seen = set()
+        for _ in range(10):
+            seen.add(websocket.receive_json()["type"])
+            if "token" in seen:
+                break
         assert "hint" in seen
+        assert "reasoning_policy" in seen
         assert "token" in seen
+
+
+def test_browser_can_skip_sparse_low_importance_event() -> None:
+    client = TestClient(app)
+    with client.websocket_connect("/ws/events") as websocket:
+        websocket.receive_json()
+        websocket.send_json(
+            {
+                "source": "test-browser",
+                "input_mode": "mediapipe_gemma",
+                "gesture": "none",
+                "attention": "focused",
+                "head_pose": "center",
+                "duration": 0.5,
+                "confidence": 0.4,
+                "importance": 0.08,
+                "reasoning_policy": "skip",
+                "cognitive_state": "focused",
+            }
+        )
+
+        messages = [websocket.receive_json() for _ in range(4)]
+        policy = next(message for message in messages if message["type"] == "reasoning_policy")
+        model_status = next(message for message in messages if message["type"] == "model_status")
+
+        assert policy["policy"] == "skip"
+        assert model_status["status"] == "skipped sparse event"
 
 
 def test_browser_can_switch_to_mediapipe_only_mode() -> None:
@@ -138,7 +170,12 @@ def test_direct_gemma_vision_reports_missing_runner_without_raw_frame_storage() 
             }
         )
 
-        messages = [websocket.receive_json() for _ in range(5)]
+        messages = []
+        for _ in range(8):
+            message = websocket.receive_json()
+            messages.append(message)
+            if message["type"] == "reasoning":
+                break
         reasoning = next(message["result"] for message in messages if message["type"] == "reasoning")
         hint = next(message["event"] for message in messages if message["type"] == "hint")
 

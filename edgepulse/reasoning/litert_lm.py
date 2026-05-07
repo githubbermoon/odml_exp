@@ -21,11 +21,14 @@ Infer:
 3. best concise assistance
 4. confidence score
 
+Respect sparse semantic reasoning: intervene only when the compressed event is important enough.
+Never request or assume continuous raw video. Treat landmarks and frame metadata as compressed perception only.
+
 Respond in compact structured JSON with keys:
 intent, should_intervene, assistance, confidence, actions.
 """
 
-VISION_PROMPT_TEMPLATE = """You are an on-device multimodal reasoning agent.
+VISION_PROMPT_TEMPLATE = """You are SecondSight, a local camera-to-text scene narrator.
 
 There is exactly one camera image attached before this text. Inspect that attached image.
 Do not ask the user to provide an image unless the runtime reports that the attachment is unreadable.
@@ -39,6 +42,8 @@ Use the attached image and event JSON to answer:
 3. whether intervention is useful
 4. best concise assistance
 5. confidence score
+
+Prefer plain scene details and visible evidence over broad assistant behavior.
 
 Respond in compact structured JSON with keys:
 intent, should_intervene, assistance, confidence, actions.
@@ -224,29 +229,29 @@ class LiteRTLMReasoner:
 
     def _mock_reasoning(self, events: list[PerceptionEvent]) -> list[str]:
         event = events[-1]
-        if event.gesture == "raised_hand":
+        if event.intent_signal == "focus_assistant" or event.gesture == "raised_hand":
             payload = {
-                "intent": "help_request",
+                "intent": "focus_assistant",
                 "should_intervene": True,
-                "assistance": "The user likely has a live question about the on-device Gemma 4 demo. Give a concise explanation and one concrete next step.",
+                "assistance": "You paused at the focus point. I can compress the current thread into one next step.",
                 "confidence": 0.86,
-                "actions": ["answer_audience_question", "suggest_next_demo_step"],
+                "actions": ["offer_summary", "preserve_focus_context"],
             }
-        elif event.gesture == "pointing":
+        elif event.intent_signal == "meeting_cognition" or event.gesture == "pointing":
             payload = {
-                "intent": "code_reference",
+                "intent": "meeting_cognition",
                 "should_intervene": True,
-                "assistance": "The user appears to be pointing at part of the demo pipeline. Explain the relevant MediaPipe/ODML to Gemma 4 path.",
+                "assistance": "Whiteboard-style context detected. I am storing the topic, open questions, and likely follow-up actions.",
                 "confidence": 0.78,
-                "actions": ["inspect_pipeline_stage", "explain_on_device_flow"],
+                "actions": ["summarize_topic", "extract_todos"],
             }
-        elif event.attention == "confused":
+        elif event.intent_signal == "confusion_trace" or event.attention == "confused":
             payload = {
                 "intent": "confusion_support",
                 "should_intervene": True,
-                "assistance": "The user may need the ODML, LiteRT-LM, and Gemma 4 roles separated. Summarize the stack in one pass.",
+                "assistance": "Confusion spike captured. Break the edge-AI stack into perception, compression, sparse reasoning, and memory.",
                 "confidence": 0.74,
-                "actions": ["explain_odml_stack", "offer_clarification"],
+                "actions": ["mark_confusion", "offer_clarification"],
             }
         else:
             payload = {

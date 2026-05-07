@@ -10,7 +10,7 @@ def test_mock_reasoning_returns_structured_result() -> None:
         return await reasoner.reason([PerceptionEvent(source="test", gesture="pointing", attention="focused")])
 
     result = asyncio.run(run())
-    assert result.intent == "code_reference"
+    assert result.intent == "meeting_cognition"
     assert result.should_intervene is True
     assert result.token_trace
 
