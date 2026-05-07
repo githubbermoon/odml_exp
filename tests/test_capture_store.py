@@ -58,3 +58,4 @@ def test_capture_store_updates_and_searches_extracted_details(tmp_path) -> None:
     assert updated.objects == ["laptop", "desk"]
     assert updated.extraction_status == "ready"
     assert match.capture_id == record.capture_id
+    assert store.search("unmatched phrase")[0].capture_id == record.capture_id

@@ -181,7 +181,10 @@ class CaptureStore:
             if score or not terms:
                 scored.append((score, record))
         scored.sort(key=lambda item: (item[0], item[1].ts), reverse=True)
-        return [record for _, record in scored[: max(1, min(limit, 24))]]
+        bounded_limit = max(1, min(limit, 24))
+        if not scored:
+            return records[:bounded_limit]
+        return [record for _, record in scored[:bounded_limit]]
 
     def _ensure_schema(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
