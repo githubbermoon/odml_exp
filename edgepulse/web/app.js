@@ -18,6 +18,7 @@ const els = {
   modeLabel: document.getElementById("modeLabel"),
   modelStatus: document.getElementById("modelStatus"),
   analyzeFrameBtn: document.getElementById("analyzeFrameBtn"),
+  panelLabel: document.getElementById("panelLabel"),
   gesture: document.getElementById("gesture"),
   attention: document.getElementById("attention"),
   headPose: document.getElementById("headPose"),
@@ -79,14 +80,18 @@ function resolveAppIdentity() {
   const port = window.location.port;
   if (port === "8443" || port === "8601") {
     return {
-      title: "SecondSight Dev",
-      subtitle: "Experimental ambient cognition runtime on the SecondSight branch",
+      title: "SecondSight",
+      subtitle: "Live camera-to-text scene narrator",
       description:
-        "Builds toward an ambient cognitive companion: MediaPipe stays on the dense realtime path, while Gemma 4 is invoked sparsely for memory, planning, and proactive assistance.",
+        "Shows what the Samsung camera sees as short text. The phone provides the live view, and local Gemma 4 Vision turns selected frames into plain-language scene descriptions.",
       useCase:
-        "Example: the phone notices a pause at a deployment diagram, stores the moment, then later offers a short recap when attention or confusion shifts.",
+        "Example: point the back camera at a desk, whiteboard, object, or room, then use Describe what I see to get a concise local text description.",
+      panelLabel: "Live scene narrator",
+      initialReasoningText: "Scene descriptions will appear here when SecondSight reads a camera frame.",
+      analyzeLabel: "Describe what I see",
+      defaultInputMode: "gemma_multimodal",
       context:
-        "SecondSight dev: ambient on-device cognition using MediaPipe/ODML, sparse Gemma 4 reasoning, and local memory",
+        "SecondSight: live camera-to-text scene narration using local Gemma 4 Vision",
     };
   }
   return {
@@ -96,6 +101,10 @@ function resolveAppIdentity() {
       "Preserves the event-ready ODML demo: Android browser MediaPipe converts camera signals into semantic events, and the Mac streams local Gemma 4 reasoning through LiteRT-LM.",
     useCase:
       "Example: point the Samsung camera at a whiteboard, trigger Inspect pipeline, and show how the local ODML/Gemma stack explains the visible setup.",
+    panelLabel: "On-device agent loop",
+    initialReasoningText: "Gemma 4 reasoning streams here after MediaPipe/ODML emits a semantic event.",
+    analyzeLabel: "Analyze frame",
+    defaultInputMode: "mediapipe_gemma",
     context:
       "ODML checkpoint: Google-hosted On-device Gemma 4 showcase with LiteRT-LM and MediaPipe/ODML perception",
   };
@@ -107,6 +116,10 @@ function applyAppIdentity() {
   els.pageSubtitle.textContent = appIdentity.subtitle;
   els.projectDescription.textContent = appIdentity.description;
   els.projectUseCase.textContent = appIdentity.useCase;
+  els.panelLabel.textContent = appIdentity.panelLabel;
+  els.reasoningText.textContent = appIdentity.initialReasoningText;
+  els.analyzeFrameBtn.textContent = appIdentity.analyzeLabel;
+  state.inputMode = appIdentity.defaultInputMode;
 }
 
 async function startPerception() {
