@@ -90,6 +90,12 @@ function resolveAppIdentity() {
       initialReasoningText: "Scene descriptions will appear here when SecondSight reads a camera frame.",
       analyzeLabel: "Describe what I see",
       defaultInputMode: "gemma_multimodal",
+      taskLabels: {
+        pointing: "Describe scene",
+        raised_hand: "Read text",
+        confused: "Identify objects",
+      },
+      visionTasks: true,
       context:
         "SecondSight: live camera-to-text scene narration using local Gemma 4 Vision",
     };
@@ -105,6 +111,12 @@ function resolveAppIdentity() {
     initialReasoningText: "Gemma 4 reasoning streams here after MediaPipe/ODML emits a semantic event.",
     analyzeLabel: "Analyze frame",
     defaultInputMode: "mediapipe_gemma",
+    taskLabels: {
+      pointing: "Inspect pipeline",
+      raised_hand: "Audience Q&A",
+      confused: "Explain stack",
+    },
+    visionTasks: false,
     context:
       "ODML checkpoint: Google-hosted On-device Gemma 4 showcase with LiteRT-LM and MediaPipe/ODML perception",
   };
@@ -120,6 +132,9 @@ function applyAppIdentity() {
   els.reasoningText.textContent = appIdentity.initialReasoningText;
   els.analyzeFrameBtn.textContent = appIdentity.analyzeLabel;
   state.inputMode = appIdentity.defaultInputMode;
+  document.querySelectorAll("[data-demo]").forEach((button) => {
+    button.textContent = appIdentity.taskLabels[button.dataset.demo] || button.dataset.demo;
+  });
 }
 
 async function startPerception() {
@@ -394,6 +409,10 @@ function maybeSendEvent(event, now) {
 }
 
 function sendDemoEvent(kind) {
+  if (appIdentity.visionTasks) {
+    sendVisionTask(kind);
+    return;
+  }
   const payloads = {
     raised_hand: {
       gesture: "raised_hand",
@@ -428,6 +447,40 @@ function sendDemoEvent(kind) {
     event_id: randomId(),
     ...payloads[kind],
   });
+}
+
+function sendVisionTask(kind) {
+  const tasks = {
+    pointing: {
+      intent_signal: "describe_scene",
+      raw_gesture: "describe_scene_button",
+    },
+    raised_hand: {
+      intent_signal: "read_visible_text",
+      raw_gesture: "read_text_button",
+    },
+    confused: {
+      intent_signal: "identify_visible_objects",
+      raw_gesture: "identify_objects_button",
+    },
+  };
+  sendEvent(
+    {
+      source: "secondsight-task-button",
+      gesture: "none",
+      attention: "focused",
+      head_pose: "center",
+      input_mode: "gemma_multimodal",
+      duration: 0,
+      context: currentEventContext(),
+      confidence: 0.74,
+      landmarks: {},
+      ts: Date.now() / 1000,
+      event_id: randomId(),
+      ...tasks[kind],
+    },
+    { includeFrame: true },
+  );
 }
 
 function sendEvent(event, options = {}) {
