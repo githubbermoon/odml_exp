@@ -29,6 +29,10 @@ const els = {
   reasoningLog: document.getElementById("reasoningLog"),
   phoneUrl: document.getElementById("phoneUrl"),
   diagnostics: document.getElementById("diagnostics"),
+  captureAskPanel: document.getElementById("captureAskPanel"),
+  captureQuestion: document.getElementById("captureQuestion"),
+  askCaptureBtn: document.getElementById("askCaptureBtn"),
+  captureAnswer: document.getElementById("captureAnswer"),
 };
 
 const appIdentity = resolveAppIdentity();
@@ -69,6 +73,10 @@ els.startBtn.addEventListener("click", startPerception);
 els.fullscreenBtn.addEventListener("click", () => document.documentElement.requestFullscreen?.());
 els.analyzeFrameBtn.addEventListener("click", analyzeCurrentFrame);
 els.saveCaptureBtn.addEventListener("click", saveCurrentCapture);
+els.askCaptureBtn.addEventListener("click", askSavedCaptures);
+els.captureQuestion.addEventListener("keydown", (event) => {
+  if (event.key === "Enter") askSavedCaptures();
+});
 els.frontCameraBtn.addEventListener("click", () => switchCamera("user"));
 els.rearCameraBtn.addEventListener("click", () => switchCamera("environment"));
 document.querySelectorAll("[data-mode]").forEach((button) => {
@@ -139,6 +147,7 @@ function applyAppIdentity() {
   els.analyzeFrameBtn.textContent = appIdentity.analyzeLabel;
   els.saveCaptureBtn.textContent = appIdentity.captureLabel;
   els.saveCaptureBtn.classList.toggle("hidden", !appIdentity.captureEnabled);
+  els.captureAskPanel.classList.toggle("hidden", !appIdentity.captureEnabled);
   state.inputMode = appIdentity.defaultInputMode;
   document.querySelectorAll("[data-demo]").forEach((button) => {
     button.textContent = appIdentity.taskLabels[button.dataset.demo] || button.dataset.demo;
@@ -549,11 +558,45 @@ async function saveCurrentCapture() {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     const capture = data.capture;
+    els.captureAnswer.textContent = capture.caption || capture.summary || "Image saved.";
+    els.reasoningText.textContent = capture.summary || capture.caption || els.reasoningText.textContent;
     renderDiagnostics(`Saved image ${capture.capture_id} (${capture.width}x${capture.height}, ${capture.bytes} bytes).`);
   } catch (error) {
     renderDiagnostics(`Image save failed: ${error.message || error}`);
   } finally {
     els.saveCaptureBtn.disabled = false;
+  }
+}
+
+async function askSavedCaptures() {
+  const question = els.captureQuestion.value.trim();
+  if (!question) {
+    els.captureAnswer.textContent = "Type a question about saved images first.";
+    return;
+  }
+  els.askCaptureBtn.disabled = true;
+  els.captureAnswer.textContent = "Searching saved image details...";
+  try {
+    const response = await fetch("/captures/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, limit: 6 }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    els.captureAnswer.textContent = data.answer || "No answer returned.";
+    state.reasoning.unshift({
+      intent: "ask_saved_images",
+      assistance: data.answer,
+      captures: data.captures?.map((capture) => capture.capture_id) || [],
+      ts: Date.now() / 1000,
+    });
+    state.reasoning = state.reasoning.slice(0, 6);
+    els.reasoningLog.textContent = JSON.stringify(state.reasoning, null, 2);
+  } catch (error) {
+    els.captureAnswer.textContent = `Question failed: ${error.message || error}`;
+  } finally {
+    els.askCaptureBtn.disabled = false;
   }
 }
 
@@ -646,9 +689,14 @@ function handleBackendMessage(message) {
     els.reasoningLog.textContent = JSON.stringify(state.reasoning, null, 2);
   }
   if (message.type === "capture") {
+    const caption = message.capture.caption || message.capture.summary || "Image saved.";
+    els.captureAnswer.textContent = caption;
     renderDiagnostics(
       `Saved image ${message.capture.capture_id} (${message.capture.width}x${message.capture.height}, ${message.capture.bytes} bytes).`,
     );
+  }
+  if (message.type === "capture_answer") {
+    els.captureAnswer.textContent = message.answer;
   }
 }
 

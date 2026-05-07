@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#071014" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-title" content="ODML Checkpoint" />
+    <meta name="apple-mobile-web-app-title" content="GhostOS Web" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <title>ODML Checkpoint</title>
+    <title>GhostOS Web</title>
     <link rel="manifest" href="/manifest.json" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
@@ -15,18 +15,18 @@
     <main class="app-shell">
       <section class="topbar">
         <div>
-          <h1 id="pageTitle">ODML Checkpoint</h1>
-          <p id="pageSubtitle">Stable On-device Gemma 4 + LiteRT-LM + MediaPipe demo</p>
+          <h1 id="pageTitle">GhostOS Web</h1>
+          <p id="pageSubtitle">Ambient cognition layer for on-device Gemma 4 + LiteRT-LM + MediaPipe</p>
           <details class="project-details">
             <summary id="projectSummary">What this project does</summary>
             <div class="project-details-body">
               <p id="projectDescription">
-                Runs a stable phone-to-Mac on-device AI demo: MediaPipe compresses camera perception into semantic events,
-                then Gemma 4 reasoning streams back through LiteRT-LM.
+                MediaPipe perceives continuously, Gemma reasons sparsely, and GhostOS stores compressed semantic memories
+                without streaming continuous raw video.
               </p>
               <p id="projectUseCase">
-                Example: point the Samsung camera at a whiteboard, tap Inspect pipeline, and see the local Gemma path explain
-                the ODML stack.
+                Example: lose focus, raise a hand, or point at a whiteboard. GhostOS infers state, intervenes subtly, and
+                remembers the semantic moment locally.
               </p>
             </div>
           </details>
@@ -42,6 +42,14 @@
           <video id="camera" playsinline muted autoplay></video>
           <canvas id="overlay"></canvas>
           <div class="camera-shade"></div>
+          <div id="ambientOrb" class="ambient-orb watching" aria-label="Ambient cognition state">
+            <span class="orb-core"></span>
+            <span class="orb-ring"></span>
+          </div>
+          <div class="ambient-hud">
+            <span id="cognitiveState">watching</span>
+            <strong id="interventionText">GhostOS is passively watching for semantic shifts.</strong>
+          </div>
           <div class="camera-hud">
             <span id="cameraStatus">camera idle</span>
             <span id="fps">0 fps</span>
@@ -54,7 +62,7 @@
         </div>
 
         <div class="copilot-panel">
-          <div id="panelLabel" class="panel-label">On-device agent loop</div>
+          <div id="panelLabel" class="panel-label">Ambient cognitive loop</div>
           <div class="mode-row" aria-label="Inference mode">
             <button class="mode-button" data-mode="mediapipe">ODML Fast</button>
             <button class="mode-button active" data-mode="mediapipe_gemma">ODML + Gemma 4</button>
@@ -62,6 +70,10 @@
           </div>
           <div id="speculativeText" class="speculative-text">Waiting for rear-camera perception...</div>
           <div id="reasoningText" class="reasoning-text">Gemma 4 reasoning streams here after MediaPipe/ODML emits a semantic event.</div>
+          <div class="policy-strip">
+            <span id="reasoningPolicy">Gemma idle</span>
+            <strong id="importanceScore">importance 0.00</strong>
+          </div>
           <div class="token-rail" id="tokenRail"></div>
           <div class="model-strip">
             <span id="modeLabel">MediaPipe + Gemma 4</span>
@@ -70,10 +82,27 @@
             <button id="analyzeFrameBtn" class="secondary-action" type="button">Analyze frame</button>
           </div>
           <div class="agent-task-strip" aria-label="Agentic demo tasks">
-            <span>Tasks</span>
+            <span>Scenarios</span>
             <button data-demo="pointing" type="button"></button>
             <button data-demo="raised_hand" type="button"></button>
             <button data-demo="confused" type="button"></button>
+          </div>
+          <div class="recall-panel">
+            <div class="panel-label">Semantic recall</div>
+            <div class="recall-actions">
+              <button data-recall="research" type="button">What did I research earlier?</button>
+              <button data-recall="today" type="button">Summarize today</button>
+              <button data-recall="confusion" type="button">What confused me?</button>
+            </div>
+            <div id="recallAnswer" class="recall-answer">Compressed semantic memories will appear as the session unfolds.</div>
+          </div>
+          <div id="captureAskPanel" class="capture-ask-panel hidden">
+            <div class="panel-label">Ask saved images</div>
+            <div class="capture-ask-row">
+              <input id="captureQuestion" type="text" placeholder="What was in the last saved image?" />
+              <button id="askCaptureBtn" class="secondary-action" type="button">Ask</button>
+            </div>
+            <div id="captureAnswer" class="capture-answer">Save an image, then ask what was visible.</div>
           </div>
         </div>
       </section>
@@ -103,11 +132,11 @@
 
       <section class="debug-grid">
         <div class="debug-panel">
-          <div class="panel-label">ODML semantic events</div>
+          <div class="panel-label">Compressed semantic events</div>
           <pre id="eventLog"></pre>
         </div>
         <div class="debug-panel">
-          <div class="panel-label">Gemma 4 trace</div>
+          <div class="panel-label">Sparse Gemma trace</div>
           <pre id="reasoningLog"></pre>
         </div>
         <div class="debug-panel">

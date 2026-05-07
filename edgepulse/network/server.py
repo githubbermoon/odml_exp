@@ -42,6 +42,8 @@ def create_app() -> FastAPI:
         "reasoning": [],
         "latency": [],
         "tokens": [],
+        "semantic_memory": [],
+        "policy_trace": [],
         "started_at": time.time(),
         "tailscale_ip": tailscale_ip(),
         "host": socket.gethostname(),
@@ -103,6 +105,10 @@ def create_app() -> FastAPI:
             record = capture_store.save(payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+        frame = payload.get("frame") if isinstance(payload.get("frame"), dict) else None
+        if frame:
+            extraction = await agent.reasoner.extract_capture_details(frame)
+            record = capture_store.update_extraction(record.capture_id, extraction)
         append_bounded(state.setdefault("captures", []), record.to_dict(), limit=32)
         await broadcast(subscribers, {"type": "capture", "capture": record.to_dict()})
         return {"ok": True, "capture": record.to_dict()}
@@ -110,6 +116,19 @@ def create_app() -> FastAPI:
     @app.get("/captures")
     async def recent_captures(limit: int = 24) -> dict[str, Any]:
         return {"captures": [record.to_dict() for record in capture_store.recent(limit=limit)]}
+
+    @app.post("/captures/ask")
+    async def ask_captures(payload: dict[str, Any]) -> dict[str, Any]:
+        question = str(payload.get("question", "")).strip()
+        if not question:
+            raise HTTPException(status_code=400, detail="question is required")
+        records = capture_store.search(question, limit=int(payload.get("limit", 6) or 6))
+        capture_payloads = [record.to_dict() for record in records]
+        answer = await agent.reasoner.answer_capture_question(question, capture_payloads)
+        response = {"answer": answer, "captures": capture_payloads}
+        append_bounded(state.setdefault("capture_questions", []), {"question": question, **response}, limit=32)
+        await broadcast(subscribers, {"type": "capture_answer", "question": question, **response})
+        return response
 
     @app.websocket("/ws/events")
     async def event_socket(ws: WebSocket) -> None:
@@ -153,6 +172,9 @@ def create_app() -> FastAPI:
             "raw_gesture": str(payload.get("raw_gesture", payload.get("gesture", "none"))),
             "context": str(payload.get("context", "on_device_gemma4_showcase")),
             "confidence": float(payload.get("confidence", 0.0)),
+            "importance": clamp_float(payload.get("importance", 0.0)),
+            "reasoning_policy": normalize_reasoning_policy(payload.get("reasoning_policy")),
+            "cognitive_state": normalize_cognitive_state(payload.get("cognitive_state")),
             "landmarks": dict(payload.get("landmarks", {})),
             "frame_meta": frame_meta,
             "ts": float(payload.get("ts", time.time())),
@@ -165,7 +187,40 @@ def create_app() -> FastAPI:
         hint = agent.instant_hint(event)
         append_bounded(state["events"], event.to_dict())
         append_bounded(state["hints"], hint.to_dict())
+        semantic_memory = compressed_memory(event, hint.text)
+        append_bounded(state["semantic_memory"], semantic_memory)
+        append_bounded(
+            state["policy_trace"],
+            {
+                "event_id": event.event_id,
+                "policy": event.reasoning_policy,
+                "importance": event.importance,
+                "cognitive_state": event.cognitive_state,
+                "intent_signal": event.intent_signal,
+                "ts": time.time(),
+            },
+        )
         await broadcast(subscribers, {"type": "hint", "hint": hint.to_dict(), "event": event.to_dict()})
+        await broadcast(subscribers, {"type": "semantic_memory", "memory": semantic_memory})
+        await broadcast(
+            subscribers,
+            {
+                "type": "reasoning_policy",
+                "event_id": event.event_id,
+                "policy": event.reasoning_policy,
+                "importance": event.importance,
+                "cognitive_state": event.cognitive_state,
+                "intent_signal": event.intent_signal,
+            },
+        )
+
+        if event.reasoning_policy == "skip":
+            state["model_status"] = "skipped sparse event"
+            await broadcast(
+                subscribers,
+                {"type": "model_status", "mode": input_mode, "status": state["model_status"]},
+            )
+            return
 
         if input_mode == "mediapipe":
             result = ReasoningResult(
@@ -266,6 +321,38 @@ def frame_metadata(frame: dict[str, Any] | None) -> dict[str, Any]:
         "width": int(frame.get("width", 0) or 0),
         "height": int(frame.get("height", 0) or 0),
         "bytes": len(str(frame.get("data_url", ""))),
+    }
+
+
+def clamp_float(value: Any, default: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    return max(0.0, min(1.0, number))
+
+
+def normalize_reasoning_policy(value: Any) -> str:
+    return "skip" if str(value) == "skip" else "invoke"
+
+
+def normalize_cognitive_state(value: Any) -> str:
+    state = str(value)
+    return state if state in {"watching", "focused", "confused", "reasoning", "intervening"} else "watching"
+
+
+def compressed_memory(event: PerceptionEvent, hint_text: str) -> dict[str, Any]:
+    return {
+        "timestamp": event.ts,
+        "event_id": event.event_id,
+        "summary": f"{event.intent_signal.replace('_', ' ')} while {event.attention}; {hint_text}",
+        "importance": event.importance,
+        "cognitive_state": event.cognitive_state,
+        "gesture": event.gesture,
+        "attention": event.attention,
+        "context": event.context,
+        "reasoning_policy": event.reasoning_policy,
+        "frame": "metadata_only" if event.frame_meta else "none",
     }
 
 

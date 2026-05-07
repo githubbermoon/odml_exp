@@ -19,6 +19,8 @@ Gesture = Literal[
 Attention = Literal["unknown", "focused", "away", "confused", "idle"]
 HeadPose = Literal["unknown", "center", "tilted_left", "tilted_right", "looking_down", "looking_away"]
 InferenceMode = Literal["mediapipe", "mediapipe_gemma", "gemma_multimodal"]
+ReasoningPolicy = Literal["skip", "invoke"]
+CognitiveState = Literal["watching", "focused", "confused", "reasoning", "intervening"]
 
 
 @dataclass(slots=True)
@@ -33,6 +35,9 @@ class PerceptionEvent:
     raw_gesture: str = "none"
     context: str = "on_device_gemma4_showcase"
     confidence: float = 0.0
+    importance: float = 0.0
+    reasoning_policy: ReasoningPolicy = "invoke"
+    cognitive_state: CognitiveState = "watching"
     landmarks: dict[str, Any] = field(default_factory=dict)
     frame_meta: dict[str, Any] = field(default_factory=dict)
     ts: float = field(default_factory=time.time)

@@ -40,12 +40,43 @@ def test_capture_endpoint_stores_frame_metadata_without_echoing_image() -> None:
     capture = response.json()["capture"]
     assert capture["bytes"] == 3
     assert capture["width"] == 2
+    assert "caption" in capture
     assert "data_url" not in capture
 
 
 def test_capture_endpoint_rejects_missing_data_url() -> None:
     client = TestClient(app)
     response = client.post("/captures", json={"frame": {"mime": "image/jpeg"}})
+
+    assert response.status_code == 400
+
+
+def test_capture_ask_answers_from_saved_details() -> None:
+    client = TestClient(app)
+    client.post(
+        "/captures",
+        json={
+            "source": "test",
+            "label": "ask_capture",
+            "frame": {
+                "mime": "image/jpeg",
+                "width": 2,
+                "height": 1,
+                "data_url": "data:image/jpeg;base64,/9j/",
+            },
+        },
+    )
+
+    response = client.post("/captures/ask", json={"question": "What was saved?"})
+
+    assert response.status_code == 200
+    assert response.json()["answer"]
+    assert "captures" in response.json()
+
+
+def test_capture_ask_requires_question() -> None:
+    client = TestClient(app)
+    response = client.post("/captures/ask", json={"question": ""})
 
     assert response.status_code == 400
 

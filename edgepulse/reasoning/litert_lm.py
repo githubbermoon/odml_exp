@@ -44,6 +44,29 @@ Respond in compact structured JSON with keys:
 intent, should_intervene, assistance, confidence, actions.
 """
 
+CAPTURE_EXTRACTION_PROMPT = """You are SecondSight, a local camera-to-text scene extractor.
+
+Inspect the attached image and return compact JSON with keys:
+caption: one short sentence describing the scene
+objects: array of visible objects or surfaces
+visible_text: any readable text, or empty string
+summary: useful details worth remembering for later questions
+tags: 3 to 8 short lowercase tags
+
+Do not invent details that are not visible.
+"""
+
+CAPTURE_QUESTION_PROMPT = """You answer questions from locally saved SecondSight captures.
+
+Question:
+{question}
+
+Relevant saved captures:
+{captures_json}
+
+Answer in one concise paragraph. If the captures do not contain enough evidence, say what is missing.
+"""
+
 
 class LiteRTLMReasoner:
     """Local Gemma/LiteRT-LM adapter.
@@ -105,6 +128,37 @@ class LiteRTLMReasoner:
             event_id=events[-1].event_id,
             token_trace=tokens,
         )
+
+    async def extract_capture_details(self, frame: dict[str, object]) -> dict[str, object]:
+        if self.vision_command:
+            tokens: list[str] = []
+            async for token in self._run_litert_vision_command(CAPTURE_EXTRACTION_PROMPT, frame):
+                tokens.append(token)
+            raw = "".join(tokens)
+            parsed = self._parse_capture_json(raw)
+            parsed["raw"] = raw
+            parsed["status"] = "ready"
+            return parsed
+        return {
+            "caption": "Image saved locally. Vision extraction is not configured in this runtime.",
+            "objects": [],
+            "visible_text": "",
+            "summary": "A camera frame was saved, but EDGEPULSE_LITERT_VISION_CMD is not configured.",
+            "tags": ["saved", "unprocessed"],
+            "status": "unprocessed",
+            "raw": "",
+        }
+
+    async def answer_capture_question(self, question: str, captures: list[dict[str, object]]) -> str:
+        if not captures:
+            return "I do not have any saved image details to answer from yet."
+        if self.command:
+            prompt = CAPTURE_QUESTION_PROMPT.format(question=question, captures_json=json.dumps(captures, indent=2))
+            tokens: list[str] = []
+            async for token in self._run_litert_command(prompt):
+                tokens.append(token)
+            return "".join(tokens).strip()
+        return self._fallback_capture_answer(question, captures)
 
     async def _run_litert_command(self, prompt: str) -> AsyncIterator[str]:
         proc = await asyncio.create_subprocess_exec(
@@ -239,3 +293,35 @@ class LiteRTLMReasoner:
         if start >= 0 and end > start:
             return text[start : end + 1]
         return text
+
+    def _parse_capture_json(self, raw: str) -> dict[str, object]:
+        try:
+            parsed = json.loads(self._extract_json(raw))
+            return {
+                "caption": str(parsed.get("caption", "")),
+                "objects": list(parsed.get("objects", [])) if isinstance(parsed.get("objects", []), list) else [],
+                "visible_text": str(parsed.get("visible_text", "")),
+                "summary": str(parsed.get("summary", parsed.get("caption", ""))),
+                "tags": list(parsed.get("tags", [])) if isinstance(parsed.get("tags", []), list) else [],
+            }
+        except json.JSONDecodeError:
+            return {
+                "caption": raw[:180],
+                "objects": [],
+                "visible_text": "",
+                "summary": raw[:360],
+                "tags": ["unstructured"],
+            }
+
+    def _fallback_capture_answer(self, question: str, captures: list[dict[str, object]]) -> str:
+        excerpts = []
+        for capture in captures[:3]:
+            summary = str(capture.get("summary") or capture.get("caption") or "").strip()
+            visible_text = str(capture.get("visible_text") or "").strip()
+            objects = ", ".join(str(item) for item in capture.get("objects", []) or [])
+            parts = [part for part in [summary, f"Visible text: {visible_text}" if visible_text else "", f"Objects: {objects}" if objects else ""] if part]
+            if parts:
+                excerpts.append(" ".join(parts))
+        if excerpts:
+            return "From the saved captures: " + " ".join(excerpts)
+        return f"I found saved captures, but they do not include extracted details that answer: {question}"
