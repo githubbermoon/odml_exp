@@ -19,6 +19,37 @@ def test_network_info_exposes_demo_urls() -> None:
     assert "http_url" in response.json()
 
 
+def test_capture_endpoint_stores_frame_metadata_without_echoing_image() -> None:
+    client = TestClient(app)
+    response = client.post(
+        "/captures",
+        json={
+            "source": "test",
+            "label": "api_capture",
+            "metadata": {"route": "secondsight"},
+            "frame": {
+                "mime": "image/jpeg",
+                "width": 2,
+                "height": 1,
+                "data_url": "data:image/jpeg;base64,/9j/",
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    capture = response.json()["capture"]
+    assert capture["bytes"] == 3
+    assert capture["width"] == 2
+    assert "data_url" not in capture
+
+
+def test_capture_endpoint_rejects_missing_data_url() -> None:
+    client = TestClient(app)
+    response = client.post("/captures", json={"frame": {"mime": "image/jpeg"}})
+
+    assert response.status_code == 400
+
+
 def test_browser_websocket_streams_hint_token_and_reasoning() -> None:
     client = TestClient(app)
     with client.websocket_connect("/ws/events") as websocket:

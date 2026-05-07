@@ -5,6 +5,7 @@ __pycache__/
 .DS_Store
 .streamlit/
 .pytest_cache/
+data/
 .gradle/
 phase3_android_native/.gradle/
 phase3_android_native/local.properties

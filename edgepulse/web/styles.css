@@ -295,7 +295,7 @@ canvas {
 
 .model-strip {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: center;
   gap: 10px;
   margin-top: 14px;
@@ -338,6 +338,10 @@ canvas {
 
 .secondary-action:disabled {
   opacity: 0.45;
+}
+
+.hidden {
+  display: none !important;
 }
 
 .metrics-grid {

@@ -6,13 +6,14 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from edgepulse.agent.loop import EdgePulseAgent
 from edgepulse.core.models import PerceptionEvent, ReasoningResult
+from edgepulse.memory.captures import CaptureStore
 
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
@@ -34,6 +35,7 @@ def create_app() -> FastAPI:
     )
 
     agent = EdgePulseAgent()
+    capture_store = CaptureStore()
     state: dict[str, Any] = {
         "events": [],
         "hints": [],
@@ -94,6 +96,20 @@ def create_app() -> FastAPI:
     async def post_event(payload: dict[str, Any]) -> dict[str, Any]:
         await handle_event(payload)
         return {"ok": True}
+
+    @app.post("/captures")
+    async def post_capture(payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            record = capture_store.save(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        append_bounded(state.setdefault("captures", []), record.to_dict(), limit=32)
+        await broadcast(subscribers, {"type": "capture", "capture": record.to_dict()})
+        return {"ok": True, "capture": record.to_dict()}
+
+    @app.get("/captures")
+    async def recent_captures(limit: int = 24) -> dict[str, Any]:
+        return {"captures": [record.to_dict() for record in capture_store.recent(limit=limit)]}
 
     @app.websocket("/ws/events")
     async def event_socket(ws: WebSocket) -> None:

@@ -1,4 +1,4 @@
-const CACHE = "edgepulse-pwa-v8";
+const CACHE = "edgepulse-pwa-v9";
 const ASSETS = ["/", "/static/styles.css", "/static/app.js", "/manifest.json", "/static/assets/icon.svg"];
 
 self.addEventListener("install", (event) => {

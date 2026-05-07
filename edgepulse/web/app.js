@@ -18,6 +18,7 @@ const els = {
   modeLabel: document.getElementById("modeLabel"),
   modelStatus: document.getElementById("modelStatus"),
   analyzeFrameBtn: document.getElementById("analyzeFrameBtn"),
+  saveCaptureBtn: document.getElementById("saveCaptureBtn"),
   panelLabel: document.getElementById("panelLabel"),
   gesture: document.getElementById("gesture"),
   attention: document.getElementById("attention"),
@@ -67,6 +68,7 @@ updateCameraUi();
 els.startBtn.addEventListener("click", startPerception);
 els.fullscreenBtn.addEventListener("click", () => document.documentElement.requestFullscreen?.());
 els.analyzeFrameBtn.addEventListener("click", analyzeCurrentFrame);
+els.saveCaptureBtn.addEventListener("click", saveCurrentCapture);
 els.frontCameraBtn.addEventListener("click", () => switchCamera("user"));
 els.rearCameraBtn.addEventListener("click", () => switchCamera("environment"));
 document.querySelectorAll("[data-mode]").forEach((button) => {
@@ -89,7 +91,9 @@ function resolveAppIdentity() {
       panelLabel: "Live scene narrator",
       initialReasoningText: "Scene descriptions will appear here when SecondSight reads a camera frame.",
       analyzeLabel: "Describe what I see",
+      captureLabel: "Save image",
       defaultInputMode: "gemma_multimodal",
+      captureEnabled: true,
       taskLabels: {
         pointing: "Describe scene",
         raised_hand: "Read text",
@@ -110,7 +114,9 @@ function resolveAppIdentity() {
     panelLabel: "On-device agent loop",
     initialReasoningText: "Gemma 4 reasoning streams here after MediaPipe/ODML emits a semantic event.",
     analyzeLabel: "Analyze frame",
+    captureLabel: "Save image",
     defaultInputMode: "mediapipe_gemma",
+    captureEnabled: false,
     taskLabels: {
       pointing: "Inspect pipeline",
       raised_hand: "Audience Q&A",
@@ -131,6 +137,8 @@ function applyAppIdentity() {
   els.panelLabel.textContent = appIdentity.panelLabel;
   els.reasoningText.textContent = appIdentity.initialReasoningText;
   els.analyzeFrameBtn.textContent = appIdentity.analyzeLabel;
+  els.saveCaptureBtn.textContent = appIdentity.captureLabel;
+  els.saveCaptureBtn.classList.toggle("hidden", !appIdentity.captureEnabled);
   state.inputMode = appIdentity.defaultInputMode;
   document.querySelectorAll("[data-demo]").forEach((button) => {
     button.textContent = appIdentity.taskLabels[button.dataset.demo] || button.dataset.demo;
@@ -517,6 +525,38 @@ function analyzeCurrentFrame() {
   );
 }
 
+async function saveCurrentCapture() {
+  const frame = captureFrame();
+  if (!frame) return;
+  els.saveCaptureBtn.disabled = true;
+  try {
+    const response = await fetch("/captures", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "secondsight-save-button",
+        label: "secondsight_capture",
+        ts: Date.now() / 1000,
+        metadata: {
+          lens: cameraFacingLabel(),
+          context: currentEventContext(),
+          input_mode: state.inputMode,
+          url: window.location.href,
+        },
+        frame,
+      }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const data = await response.json();
+    const capture = data.capture;
+    renderDiagnostics(`Saved image ${capture.capture_id} (${capture.width}x${capture.height}, ${capture.bytes} bytes).`);
+  } catch (error) {
+    renderDiagnostics(`Image save failed: ${error.message || error}`);
+  } finally {
+    els.saveCaptureBtn.disabled = false;
+  }
+}
+
 function captureFrame() {
   if (els.video.readyState < 2) {
     renderDiagnostics("No live video frame is available yet.");
@@ -604,6 +644,11 @@ function handleBackendMessage(message) {
     state.reasoning.unshift(message.result);
     state.reasoning = state.reasoning.slice(0, 6);
     els.reasoningLog.textContent = JSON.stringify(state.reasoning, null, 2);
+  }
+  if (message.type === "capture") {
+    renderDiagnostics(
+      `Saved image ${message.capture.capture_id} (${message.capture.width}x${message.capture.height}, ${message.capture.bytes} bytes).`,
+    );
   }
 }
 
