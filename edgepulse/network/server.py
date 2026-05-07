@@ -6,7 +6,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -73,18 +73,19 @@ def create_app() -> FastAPI:
         return {"ok": True, "host": socket.gethostname(), "tailscale_ip": state["tailscale_ip"]}
 
     @app.get("/network-info")
-    async def network_info() -> dict[str, Any]:
+    async def network_info(request: Request) -> dict[str, Any]:
         current_tailscale_ip = tailscale_ip()
         current_tailscale_dns = tailscale_dns_name()
+        current_port = request.url.port or 8501
         state["tailscale_ip"] = current_tailscale_ip
         return {
             "host": state["host"],
             "tailscale_ip": current_tailscale_ip,
             "tailscale_dns": current_tailscale_dns,
-            "http_url": "http://127.0.0.1:8501",
-            "tailscale_http_url": f"http://{current_tailscale_ip}:8501" if current_tailscale_ip else None,
+            "http_url": f"http://127.0.0.1:{current_port}",
+            "tailscale_http_url": f"http://{current_tailscale_ip}:{current_port}" if current_tailscale_ip else None,
             "tailscale_https_url": f"https://{current_tailscale_dns}/" if current_tailscale_dns else None,
-            "tailscale_https_hint": "Use `tailscale serve --bg http://127.0.0.1:8501` for camera-safe HTTPS.",
+            "tailscale_https_hint": f"Use `tailscale serve --bg http://127.0.0.1:{current_port}` for camera-safe HTTPS.",
             "inference_mode": state["inference_mode"],
             "available_inference_modes": INFERENCE_MODES,
             "model_status": state["model_status"],
