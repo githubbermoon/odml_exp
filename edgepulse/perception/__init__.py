@@ -1,0 +1,1 @@
+"""MediaPipe perception components."""

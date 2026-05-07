@@ -1,0 +1,421 @@
+:root {
+  color-scheme: dark;
+  --bg: #071014;
+  --panel: #0d1820;
+  --panel-2: #111f28;
+  --line: #233541;
+  --text: #ecf7ff;
+  --muted: #91a7b8;
+  --green: #75e6b0;
+  --cyan: #7bdff2;
+  --amber: #ffd166;
+  --danger: #ff6b6b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 20% 0%, rgba(123, 223, 242, 0.12), transparent 28rem),
+    linear-gradient(145deg, #071014 0%, #0a1117 55%, #071014 100%);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #14242e;
+  color: var(--text);
+  min-height: 42px;
+  padding: 0 14px;
+  font: inherit;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+.app-shell {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(22px, env(safe-area-inset-bottom));
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 52px);
+  line-height: 1;
+  font-weight: 760;
+}
+
+p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.status-stack {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.status-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 11px;
+  color: var(--amber);
+  background: rgba(17, 31, 40, 0.75);
+  white-space: nowrap;
+}
+
+.status-chip.ready {
+  color: var(--green);
+}
+
+.icon-button {
+  width: 42px;
+  padding: 0;
+  font-size: 22px;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
+  gap: 14px;
+}
+
+.camera-panel,
+.copilot-panel,
+.debug-panel,
+.metric {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(13, 24, 32, 0.86);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.28);
+}
+
+.camera-panel {
+  min-height: 62vh;
+  position: relative;
+  overflow: hidden;
+}
+
+video,
+canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+canvas {
+  z-index: 2;
+}
+
+.camera-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(7, 16, 20, 0.08), rgba(7, 16, 20, 0.58));
+}
+
+.camera-hud {
+  position: absolute;
+  z-index: 4;
+  inset: 12px 12px auto 12px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--green);
+  font-size: 13px;
+}
+
+.camera-controls {
+  position: absolute;
+  z-index: 4;
+  right: 12px;
+  bottom: 72px;
+  display: flex;
+  gap: 8px;
+}
+
+.camera-button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--muted);
+  background: rgba(13, 24, 32, 0.78);
+}
+
+.camera-button.active {
+  border-color: rgba(117, 230, 176, 0.62);
+  color: var(--green);
+  background: rgba(117, 230, 176, 0.13);
+}
+
+.camera-button:disabled {
+  opacity: 0.45;
+}
+
+.primary-action {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  min-width: 190px;
+  border-color: rgba(117, 230, 176, 0.6);
+  background: rgba(117, 230, 176, 0.14);
+}
+
+.copilot-panel {
+  padding: 18px;
+  min-height: 62vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-label {
+  color: var(--cyan);
+  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 720;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+
+.mode-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.mode-button {
+  min-height: 38px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.mode-button.active {
+  border-color: rgba(117, 230, 176, 0.62);
+  color: var(--green);
+  background: rgba(117, 230, 176, 0.13);
+}
+
+.speculative-text {
+  min-height: 116px;
+  color: var(--green);
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.08;
+  font-weight: 760;
+}
+
+.reasoning-text {
+  margin-top: 22px;
+  color: #d7e8f2;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.token-rail {
+  margin-top: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-content: flex-end;
+  max-height: 160px;
+  overflow: hidden;
+}
+
+.token {
+  border: 1px solid rgba(123, 223, 242, 0.28);
+  border-radius: 6px;
+  padding: 4px 6px;
+  color: var(--cyan);
+  background: rgba(123, 223, 242, 0.08);
+  font-size: 12px;
+}
+
+.model-strip {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.model-strip strong {
+  color: var(--amber);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.agent-task-strip {
+  display: grid;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.agent-task-strip button {
+  min-height: 34px;
+  padding: 0 8px;
+  color: var(--cyan);
+  background: rgba(123, 223, 242, 0.08);
+  border-color: rgba(123, 223, 242, 0.26);
+  font-size: 12px;
+}
+
+.secondary-action {
+  min-height: 36px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.secondary-action:disabled {
+  opacity: 0.45;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.metric {
+  padding: 14px;
+}
+
+.metric span {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metric strong {
+  display: block;
+  margin-top: 7px;
+  font-size: 22px;
+}
+
+.debug-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 0.9fr;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.debug-panel {
+  padding: 14px;
+  min-height: 190px;
+}
+
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  color: #cce0ec;
+  font-size: 12px;
+  line-height: 1.45;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.phone-url {
+  color: var(--green);
+  font-weight: 720;
+  word-break: break-all;
+}
+
+.diagnostics {
+  margin-top: 10px;
+  border: 1px solid rgba(255, 209, 102, 0.26);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--amber);
+  background: rgba(255, 209, 102, 0.07);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}
+
+.helper-copy {
+  font-size: 13px;
+}
+
+.demo-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .hero-grid,
+  .debug-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-panel {
+    min-height: 58vh;
+  }
+
+  .copilot-panel {
+    min-height: 300px;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mode-row,
+  .model-strip,
+  .agent-task-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-controls {
+    right: 10px;
+    bottom: 68px;
+  }
+}
+
+@media (display-mode: fullscreen), (display-mode: standalone) {
+  .app-shell {
+    padding-top: max(10px, env(safe-area-inset-top));
+  }
+}

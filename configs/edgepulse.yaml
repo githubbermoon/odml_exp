@@ -1,0 +1,31 @@
+runtime:
+  host: 0.0.0.0
+  port: 8501
+  mode: browser-pwa-mvp
+
+model:
+  family: Gemma
+  target: Gemma E2B or E4B
+  runtime: LiteRT-LM
+  local_only: true
+  mtp_ready: true
+
+perception:
+  mac_camera_index: 0
+  min_event_interval_ms: 80
+  mediapipe:
+    hands: true
+    face_mesh: true
+    pose: false
+
+network:
+  transport: websocket
+  private_mesh: tailscale
+  android_event_path: /ws/events
+  dashboard_stream_path: /ws/stream
+  pwa_url_path: /
+
+speculative_interaction:
+  target_hint_latency_ms: 100
+  strategy: heuristic_drafter_then_litert_refinement
+  implements_true_speculative_decoding: false

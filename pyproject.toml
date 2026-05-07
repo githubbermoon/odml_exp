@@ -1,0 +1,13 @@
+[project]
+name = "edgepulse"
+version = "0.1.0"
+description = "Private real-time multimodal edge AI copilot for Gemma, LiteRT-LM, MediaPipe, Android, and Tailscale."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"

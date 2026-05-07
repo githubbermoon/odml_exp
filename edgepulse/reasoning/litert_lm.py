@@ -1,0 +1,241 @@
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import shlex
+import time
+from collections.abc import AsyncIterator
+
+from edgepulse.core.models import PerceptionEvent, ReasoningResult
+
+
+PROMPT_TEMPLATE = """You are an on-device multimodal reasoning agent.
+
+Input events:
+{events_json}
+
+Infer:
+1. probable user intent
+2. whether intervention is useful
+3. best concise assistance
+4. confidence score
+
+Respond in compact structured JSON with keys:
+intent, should_intervene, assistance, confidence, actions.
+"""
+
+VISION_PROMPT_TEMPLATE = """You are an on-device multimodal reasoning agent.
+
+There is exactly one camera image attached before this text. Inspect that attached image.
+Do not ask the user to provide an image unless the runtime reports that the attachment is unreadable.
+
+Input event:
+{event_json}
+
+Use the attached image and event JSON to answer:
+1. what visible context matters
+2. probable user intent
+3. whether intervention is useful
+4. best concise assistance
+5. confidence score
+
+Respond in compact structured JSON with keys:
+intent, should_intervene, assistance, confidence, actions.
+"""
+
+
+class LiteRTLMReasoner:
+    """Local Gemma/LiteRT-LM adapter.
+
+    Configure EDGEPULSE_LITERT_CMD with a command that accepts the prompt on stdin
+    and streams tokens/stdout. Without it, EdgePulse uses a deterministic offline
+    path for demo development.
+    """
+
+    def __init__(self, model_name: str = "gemma-e2b-litert-lm") -> None:
+        self.model_name = os.getenv("EDGEPULSE_MODEL", model_name)
+        self.command = os.getenv("EDGEPULSE_LITERT_CMD", "").strip()
+        self.vision_command = os.getenv("EDGEPULSE_LITERT_VISION_CMD", "").strip()
+
+    async def reason_stream(self, events: list[PerceptionEvent], frame: dict[str, object] | None = None) -> AsyncIterator[str]:
+        if frame:
+            prompt = VISION_PROMPT_TEMPLATE.format(events_json="", event_json=json.dumps(events[-1].to_dict(), indent=2))
+            if self.vision_command:
+                async for token in self._run_litert_vision_command(prompt, frame):
+                    yield token
+                return
+            yield json.dumps(
+                {
+                    "intent": "multimodal_runner_unconfigured",
+                    "should_intervene": True,
+                    "assistance": "Direct Gemma vision mode captured a frame, but EDGEPULSE_LITERT_VISION_CMD is not configured yet. Use MediaPipe + Gemma for the live path or add an image-capable LiteRT-LM wrapper.",
+                    "confidence": 0.3,
+                    "actions": ["configure_litert_vision_runner", "fall_back_to_mediapipe_gemma"],
+                }
+            )
+            return
+
+        prompt = PROMPT_TEMPLATE.format(events_json=json.dumps([e.to_dict() for e in events], indent=2))
+        if self.command:
+            async for token in self._run_litert_command(prompt):
+                yield token
+            return
+
+        for token in self._mock_reasoning(events):
+            await asyncio.sleep(0.025)
+            yield token
+
+    async def reason(self, events: list[PerceptionEvent]) -> ReasoningResult:
+        started = time.perf_counter()
+        tokens: list[str] = []
+        async for token in self.reason_stream(events):
+            tokens.append(token)
+        raw = "".join(tokens)
+        parsed = self._parse_or_repair(raw, events[-1])
+        return ReasoningResult(
+            intent=str(parsed["intent"]),
+            should_intervene=bool(parsed["should_intervene"]),
+            assistance=str(parsed["assistance"]),
+            confidence=float(parsed["confidence"]),
+            actions=list(parsed.get("actions", [])),
+            raw=raw,
+            model=self.model_name,
+            latency_ms=(time.perf_counter() - started) * 1000,
+            event_id=events[-1].event_id,
+            token_trace=tokens,
+        )
+
+    async def _run_litert_command(self, prompt: str) -> AsyncIterator[str]:
+        proc = await asyncio.create_subprocess_exec(
+            *shlex.split(self.command),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        assert proc.stdin and proc.stdout
+        proc.stdin.write(prompt.encode("utf-8"))
+        await proc.stdin.drain()
+        proc.stdin.close()
+
+        while True:
+            chunk = await proc.stdout.read(24)
+            if not chunk:
+                break
+            yield chunk.decode("utf-8", errors="replace")
+
+        code = await proc.wait()
+        if code != 0:
+            stderr = await proc.stderr.read() if proc.stderr else b""
+            yield json.dumps(
+                {
+                    "intent": "runtime_error",
+                    "should_intervene": True,
+                    "assistance": f"LiteRT-LM runner failed: {stderr.decode('utf-8', errors='replace')[:180]}",
+                    "confidence": 0.2,
+                    "actions": ["check_litert_lm_command"],
+                }
+            )
+
+    async def _run_litert_vision_command(self, prompt: str, frame: dict[str, object]) -> AsyncIterator[str]:
+        proc = await asyncio.create_subprocess_exec(
+            *shlex.split(self.vision_command),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        assert proc.stdin and proc.stdout
+        proc.stdin.write(json.dumps({"prompt": prompt, "frame": frame}).encode("utf-8"))
+        await proc.stdin.drain()
+        proc.stdin.close()
+
+        while True:
+            chunk = await proc.stdout.read(24)
+            if not chunk:
+                break
+            yield chunk.decode("utf-8", errors="replace")
+
+        code = await proc.wait()
+        if code != 0:
+            stderr = await proc.stderr.read() if proc.stderr else b""
+            yield json.dumps(
+                {
+                    "intent": "runtime_error",
+                    "should_intervene": True,
+                    "assistance": f"LiteRT-LM vision runner failed: {stderr.decode('utf-8', errors='replace')[:180]}",
+                    "confidence": 0.2,
+                    "actions": ["check_litert_vision_command"],
+                }
+            )
+
+    def _mock_reasoning(self, events: list[PerceptionEvent]) -> list[str]:
+        event = events[-1]
+        if event.gesture == "raised_hand":
+            payload = {
+                "intent": "help_request",
+                "should_intervene": True,
+                "assistance": "The user likely has a live question about the on-device Gemma 4 demo. Give a concise explanation and one concrete next step.",
+                "confidence": 0.86,
+                "actions": ["answer_audience_question", "suggest_next_demo_step"],
+            }
+        elif event.gesture == "pointing":
+            payload = {
+                "intent": "code_reference",
+                "should_intervene": True,
+                "assistance": "The user appears to be pointing at part of the demo pipeline. Explain the relevant MediaPipe/ODML to Gemma 4 path.",
+                "confidence": 0.78,
+                "actions": ["inspect_pipeline_stage", "explain_on_device_flow"],
+            }
+        elif event.attention == "confused":
+            payload = {
+                "intent": "confusion_support",
+                "should_intervene": True,
+                "assistance": "The user may need the ODML, LiteRT-LM, and Gemma 4 roles separated. Summarize the stack in one pass.",
+                "confidence": 0.74,
+                "actions": ["explain_odml_stack", "offer_clarification"],
+            }
+        else:
+            payload = {
+                "intent": "ambient_monitoring",
+                "should_intervene": False,
+                "assistance": "Keep monitoring quietly and preserve local context for a future assist.",
+                "confidence": 0.55,
+                "actions": ["remember_context"],
+            }
+        text = json.dumps(payload)
+        return [text[i : i + 10] for i in range(0, len(text), 10)]
+
+    def _parse_or_repair(self, raw: str, event: PerceptionEvent) -> dict[str, object]:
+        raw_json = self._extract_json(raw)
+        try:
+            parsed = json.loads(raw_json)
+            return {
+                "intent": parsed.get("intent", "unknown"),
+                "should_intervene": parsed.get("should_intervene", False),
+                "assistance": parsed.get("assistance", raw[:240]),
+                "confidence": parsed.get("confidence", 0.4),
+                "actions": parsed.get("actions", []),
+            }
+        except json.JSONDecodeError:
+            return {
+                "intent": "unstructured_reasoning",
+                "should_intervene": event.gesture != "none",
+                "assistance": raw[:360],
+                "confidence": 0.45,
+                "actions": ["review_stream"],
+            }
+
+    def _extract_json(self, raw: str) -> str:
+        text = raw.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            if lines and lines[0].startswith("```"):
+                lines = lines[1:]
+            if lines and lines[-1].startswith("```"):
+                lines = lines[:-1]
+            text = "\n".join(lines).strip()
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            return text[start : end + 1]
+        return text

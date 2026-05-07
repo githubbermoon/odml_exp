@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#071014" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="On-device Gemma 4" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>On-device Gemma 4</title>
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="topbar">
+        <div>
+          <h1>On-device Gemma 4</h1>
+          <p>Google-hosted LiteRT-LM with MediaPipe/ODML perception on Android</p>
+        </div>
+        <div class="status-stack">
+          <span id="wsStatus" class="status-chip">connecting</span>
+          <button id="fullscreenBtn" class="icon-button" title="Fullscreen">⛶</button>
+        </div>
+      </section>
+
+      <section class="hero-grid">
+        <div class="camera-panel">
+          <video id="camera" playsinline muted autoplay></video>
+          <canvas id="overlay"></canvas>
+          <div class="camera-shade"></div>
+          <div class="camera-hud">
+            <span id="cameraStatus">camera idle</span>
+            <span id="fps">0 fps</span>
+          </div>
+          <div class="camera-controls" aria-label="Camera lens">
+            <button id="frontCameraBtn" class="camera-button" type="button" data-camera-facing="user">Front</button>
+            <button id="rearCameraBtn" class="camera-button active" type="button" data-camera-facing="environment">Back</button>
+          </div>
+          <button id="startBtn" class="primary-action">Start perception</button>
+        </div>
+
+        <div class="copilot-panel">
+          <div class="panel-label">On-device agent loop</div>
+          <div class="mode-row" aria-label="Inference mode">
+            <button class="mode-button" data-mode="mediapipe">ODML Fast</button>
+            <button class="mode-button active" data-mode="mediapipe_gemma">ODML + Gemma 4</button>
+            <button class="mode-button" data-mode="gemma_multimodal">Gemma 4 Vision</button>
+          </div>
+          <div id="speculativeText" class="speculative-text">Waiting for rear-camera perception...</div>
+          <div id="reasoningText" class="reasoning-text">Gemma 4 reasoning streams here after MediaPipe/ODML emits a semantic event.</div>
+          <div class="token-rail" id="tokenRail"></div>
+          <div class="model-strip">
+            <span id="modeLabel">MediaPipe + Gemma 4</span>
+            <strong id="modelStatus">checking</strong>
+            <button id="analyzeFrameBtn" class="secondary-action" type="button">Analyze frame</button>
+          </div>
+          <div class="agent-task-strip" aria-label="Agentic demo tasks">
+            <span>Tasks</span>
+            <button data-demo="pointing" type="button">Inspect pipeline</button>
+            <button data-demo="raised_hand" type="button">Audience Q&amp;A</button>
+            <button data-demo="confused" type="button">Explain stack</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="metrics-grid">
+        <div class="metric">
+          <span>Gesture</span>
+          <strong id="gesture">none</strong>
+        </div>
+        <div class="metric">
+          <span>Attention</span>
+          <strong id="attention">unknown</strong>
+        </div>
+        <div class="metric">
+          <span>Head Pose</span>
+          <strong id="headPose">unknown</strong>
+        </div>
+        <div class="metric">
+          <span>Speculative</span>
+          <strong id="specMs">0 ms</strong>
+        </div>
+        <div class="metric">
+          <span>Mode</span>
+          <strong id="activeMode">Gemma 4</strong>
+        </div>
+      </section>
+
+      <section class="debug-grid">
+        <div class="debug-panel">
+          <div class="panel-label">ODML semantic events</div>
+          <pre id="eventLog"></pre>
+        </div>
+        <div class="debug-panel">
+          <div class="panel-label">Gemma 4 trace</div>
+          <pre id="reasoningLog"></pre>
+        </div>
+        <div class="debug-panel">
+          <div class="panel-label">Open on phone</div>
+          <div id="phoneUrl" class="phone-url">Detecting Tailscale...</div>
+          <div id="diagnostics" class="diagnostics">Diagnostics pending...</div>
+          <p class="helper-copy">
+            Open the HTTPS URL above on Android. The app starts with the rear lens for faster booth/tabletop detection.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

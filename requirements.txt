@@ -1,0 +1,10 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+websockets==14.1
+httpx==0.28.1
+streamlit==1.41.1
+pandas==2.2.3
+opencv-python==4.10.0.84
+mediapipe==0.10.18
+pyyaml==6.0.2
+pytest==8.3.4
